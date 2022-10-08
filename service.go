@@ -10,11 +10,13 @@ func NewService(repo Repository) Service {
 	}
 }
 
-func (s Service) RegisterPlayer(player Player) error {
+func (s Service) RegisterPlayer(player Player) ([]Player, error) {
 	err := s.repo.RegisterPlayer(player)
 	if err != nil {
-		return err
+		return nil, err
 	}
-	
-	return nil
+
+	listOfPlayers := s.repo.ListPlayers(player.Name)
+
+	return listOfPlayers, nil
 }

@@ -3,6 +3,7 @@ package main
 import (
 	"encoding/json"
 	"net/http"
+
 )
 
 func RegisterPlayerHandler(s Service) http.HandlerFunc {
@@ -15,11 +16,23 @@ func RegisterPlayerHandler(s Service) http.HandlerFunc {
 
 		body.Health = 100
 		
-		err = s.RegisterPlayer(body)
+		allPlayers, err := s.RegisterPlayer(body)
 		if err != nil {
 			panic(err)
 		}
 
-		w.WriteHeader(http.StatusOK)
+		json.NewEncoder(w).Encode(allPlayers)
+	}
+}
+
+func WebsocketHandler(h *Hub) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		name := r.URL.Query().Get("name")
+		conn, err := upgrader.Upgrade(w, r, nil)
+		if err != nil {
+			panic(err)
+		}
+
+		h.AddClient(name, conn)
 	}
 }

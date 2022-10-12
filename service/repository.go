@@ -11,6 +11,6 @@ type Repository interface {
 	CreateMatch(match match.Match)
 	GetPlayer(name string) player.Player
 	RemovePlayer(name string)
-	ListPlayers(name string) []player.Player
-	RegisterPlayer(player player.Player) error
+	ListPlayers() []player.Player
+	SavePlayer(player player.Player) error
 }

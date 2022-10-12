@@ -51,7 +51,7 @@ func (r *InMemoryRepository) RemovePlayer(name string) {
 	delete(r.players, name)
 }
 
-func (r *InMemoryRepository) RegisterPlayer(player player.Player) error {
+func (r *InMemoryRepository) SavePlayer(player player.Player) error {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	r.players[player.Name] = player
@@ -59,18 +59,14 @@ func (r *InMemoryRepository) RegisterPlayer(player player.Player) error {
 	return nil
 }
 
-func (r *InMemoryRepository) ListPlayers(name string) []player.Player {
+func (r *InMemoryRepository) ListPlayers() []player.Player {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
 	players := make([]player.Player, 0, len(r.players))
-	for key, value := range r.players {
-		if key == name {
-			continue
-		}
+	for _, value := range r.players {
 		players = append(players, value)
 	}
 
 	return players
 }
-

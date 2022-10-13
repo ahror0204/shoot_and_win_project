@@ -7,18 +7,25 @@ import (
 	"github.com/shoot_and_win/player"
 )
 
-type InMemoryRepository struct {
-	players map[string]player.Player
-	matches map[string]match.Match
-	mu      *sync.Mutex
-}
-
 func NewInMemoryRepository() *InMemoryRepository {
 	return &InMemoryRepository{
 		players: make(map[string]player.Player),
 		matches: make(map[string]match.Match),
 		mu:      &sync.Mutex{},
 	}
+}
+
+type InMemoryRepository struct {
+	players map[string]player.Player
+	matches map[string]match.Match
+	mu      *sync.Mutex
+}
+
+
+func (r *InMemoryRepository) RemoveMatch(id string) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	delete(r.matches, id)
 }
 
 func (r *InMemoryRepository) GetMatch(id string) match.Match {

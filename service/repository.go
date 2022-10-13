@@ -6,6 +6,7 @@ import (
 )
 
 type Repository interface {
+	RemoveMatch(id string)
 	GetMatch(id string) match.Match
 	UpdateMatch(match match.Match)
 	CreateMatch(match match.Match)

@@ -13,7 +13,6 @@ import (
 	"github.com/shoot_and_win/service"
 )
 
-
 const (
 	EventPlayerJoined       = "player_joined"
 	EventNewAvailablePlayer = "new_available_player"
@@ -23,12 +22,6 @@ const (
 	EventGameOver           = "game_over"
 )
 
-type WebsocketHandler struct {
-	s        service.Service
-	hub      *hub.Hub
-	commands <-chan command.Command
-}
-
 func NewWebsocketHandler(s service.Service, h *hub.Hub, comm <-chan command.Command) WebsocketHandler {
 	return WebsocketHandler{
 		s:        s,
@@ -37,26 +30,34 @@ func NewWebsocketHandler(s service.Service, h *hub.Hub, comm <-chan command.Comm
 	}
 }
 
+type WebsocketHandler struct {
+	s        service.Service
+	hub      *hub.Hub
+	commands <-chan command.Command
+}
+
+
 func (h *WebsocketHandler) Run() {
 	go func() {
 		for cmd := range h.commands {
 			fmt.Printf("reacived command %s: %s\n", cmd.Name(), cmd.Payload())
 			switch cmd.Name() {
 			case command.WaitForOpponent:
+
 				var payload WaitForOpponentPayload
 				err := json.Unmarshal(cmd.Payload(), &payload)
 				if err != nil {
 					log.Printf("failed to unmarshal %s payload: %v\n", cmd.Name(), err)
 					continue
 				}
+				
 				h.s.WaitForSomeone(payload.Player.Name)
+		
 				event := Event{
 					Name:   EventNewAvailablePlayer,
 					Player: payload.Player,
 				}
-
 				h.notifyOthers(payload.Player.Name, event.Marshal())
-
 			case command.Play:
 				var payload PlayPayload
 				err := json.Unmarshal(cmd.Payload(), &payload)
@@ -80,14 +81,14 @@ func (h *WebsocketHandler) Run() {
 				id := uuid.NewString()
 
 				m := match.Match{
-					ID: id,
-					Player1: player,
-					Player2: rival,
+					ID:           id,
+					Player1:      player,
+					Player2:      rival,
 					Player1Ready: false,
 					Player2Ready: false,
 				}
 				h.s.CreateMatch(m)
-				
+
 				event = Event{
 					Name: EventMatchCreated,
 					MetaData: map[string]interface{}{
@@ -127,7 +128,46 @@ func (h *WebsocketHandler) Run() {
 					h.hub.Write(m.Player2, event.Marshal())
 				}
 			case command.Shoot:
-				
+				var payload ShootPayload
+				err := json.Unmarshal(cmd.Payload(), &payload)
+				if err != nil {
+					log.Printf("failed to unmarshal %s payload: %v\n", cmd.Name(), err)
+					continue
+				}
+				shooter := h.s.GetPlayer(payload.Shooter.Name)
+				getShoter := h.s.GetPlayer(payload.GetShoter.Name)
+				m := h.s.GetMatch(payload.MatchID)
+				if (m.Player1.Name == shooter.Name && m.Player2.Name == getShoter.Name) || (m.Player1.Name == getShoter.Name && m.Player2.Name == shooter.Name) {
+					if getShoter.Health > 0 {
+						getShoter.Health -= 10
+						h.s.SavePlayer(getShoter)
+					}
+
+					if getShoter.Health == 0 {
+						event := Event{
+							Name: EventSomeoneWin,
+							Player: shooter,
+							MetaData: map[string]interface{}{
+								"match_id": m.ID,
+							},
+						}
+						h.hub.Write(shooter, event.Marshal())
+
+						event = Event{
+							Name: EventGameOver,
+							MetaData: map[string]interface{}{
+								"match_id":payload.MatchID,
+							},
+						}
+						h.hub.Write(shooter, event.Marshal())
+						h.hub.Write(getShoter, event.Marshal())
+						h.s.RemoveMatch(m.ID)
+						h.s.RemovePlayer(getShoter.Name)
+					}
+					h.hub.Write(getShoter, []byte(m.ID))
+				}
+				log.Println("error: match and players are not matched")
+
 			default:
 				panic("no such command")
 			}
@@ -150,18 +190,24 @@ func (h *WebsocketHandler) notifyOthers(self string, event []byte) {
 	}
 }
 
-type StartPayload struct{
-	MatchID string `json:"match_id"`
-	Player player.Player `json:"player"`
-}
-
-type WaitForOpponentPayload struct {
-	Player player.Player `json:"player"`
+type ShootPayload struct {
+	MatchID       string        `json:"match_id"`
+	Shooter   player.Player `json:"shoot_player"`
+	GetShoter player.Player `json:"get_shot_player"`
 }
 
 type PlayPayload struct {
 	Player player.Player `json:"player"`
 	Rival  player.Player `json:"rival"`
+}
+
+type StartPayload struct {
+	MatchID string        `json:"match_id"`
+	Player  player.Player `json:"player"`
+}
+
+type WaitForOpponentPayload struct {
+	Player player.Player `json:"player"`
 }
 
 type Event struct {

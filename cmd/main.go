@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/json"
+	
 	"net/http"
 
 	"github.com/gorilla/websocket"
@@ -34,7 +35,6 @@ func main() {
 
 		serverWS(w, r, s, h, p)
 	})
-
 	http.ListenAndServe("localhost:8080", r)
 }
 
@@ -47,15 +47,15 @@ func serverWS(w http.ResponseWriter, r *http.Request, s service.Service, h *hub.
 	p.Conn = conn
 
 	s.CreatePlayer(p)
-
+	
 	h.Read(p)
-
+	
 	availablePlayers, err := json.Marshal(s.AvailablePlayers())
 	if err != nil {
 		panic(err)
 	}
-	 err = h.Write(p, availablePlayers)
-	 if err != nil {
+	err = h.Write(p, availablePlayers)
+	if err != nil {
 		panic(err)
 	}
 }

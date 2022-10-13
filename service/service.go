@@ -7,34 +7,39 @@ import (
 	"github.com/shoot_and_win/player"
 )
 
-type Service struct {
-	repo Repository
-}
-
 func NewService(repo Repository) Service {
 	return Service{
 		repo: repo,
 	}
 }
 
+type Service struct {
+	repo Repository
+}
+
+
+func (s Service) RemoveMatch(id string) {
+	s.repo.RemoveMatch(id)
+}
+
 func (s Service) GetMatch(matchID string) match.Match{
-	return s.GetMatch(matchID)
+	return s.repo.GetMatch(matchID)
 }
 
 func (s Service) UpdateMatch(match match.Match) {
-	s.CreateMatch(match)
+	s.repo.CreateMatch(match)
 }
 
 func (s Service) CreateMatch(match match.Match) {
-	s.UpdateMatch(match)
+	s.repo.UpdateMatch(match)
 }
 
 func (s Service) GetPlayer(name string) player.Player {
-	return s.GetPlayer(name)
+	return s.repo.GetPlayer(name)
 }
 
 func (s Service) RemovePlayer(name string) {
-	s.RemovePlayer(name)
+	s.repo.RemovePlayer(name)
 }
 
 func (s Service) SavePlayer(player player.Player) ([]player.Player, error) {

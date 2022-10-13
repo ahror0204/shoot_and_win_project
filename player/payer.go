@@ -1,9 +1,6 @@
 package player
 
 import (
-	"fmt"
-	"strconv"
-
 	"github.com/gorilla/websocket"
 )
 
@@ -20,14 +17,4 @@ func (p *Player) SetWaitingForOpponent(b bool) {
 
 func (p *Player) IsWaitingForOpponent() bool {
 	return p.isWaitingForOpponent
-}
-
-func (p *Player) GetShot() string {
-	p.Health -= 10
-
-	if p.Health == 0 {
-		return fmt.Sprintf("Player:%s \nHealth status: died", p.Name)
-	}
-
-	return strconv.Itoa(int(p.Health))
 }

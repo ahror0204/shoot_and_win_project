@@ -59,7 +59,3 @@ func serverWS(w http.ResponseWriter, r *http.Request, s service.Service, h *hub.
 		panic(err)
 	}
 }
-
-type REquest struct {
-	Name string `json:"name"`
-}

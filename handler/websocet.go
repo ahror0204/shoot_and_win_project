@@ -18,8 +18,10 @@ const (
 	EventNewAvailablePlayer = "new_available_player"
 	EventMatchCreated       = "match_created"
 	EventMatchStarted       = "match_started"
-	EventSomeoneWin         = "someone_win"
+	EventYouWon             = "you_won"
+	EventYouLost            = "you_lost"
 	EventGameOver           = "game_over"
+	EventPlayerUpdate       = "player_update"
 )
 
 func NewWebsocketHandler(s service.Service, h *hub.Hub, comm <-chan command.Command) WebsocketHandler {
@@ -36,7 +38,6 @@ type WebsocketHandler struct {
 	commands <-chan command.Command
 }
 
-
 func (h *WebsocketHandler) Run() {
 	go func() {
 		for cmd := range h.commands {
@@ -50,9 +51,9 @@ func (h *WebsocketHandler) Run() {
 					log.Printf("failed to unmarshal %s payload: %v\n", cmd.Name(), err)
 					continue
 				}
-				
+
 				h.s.WaitForSomeone(payload.Player.Name)
-		
+
 				event := Event{
 					Name:   EventNewAvailablePlayer,
 					Player: payload.Player,
@@ -134,39 +135,58 @@ func (h *WebsocketHandler) Run() {
 					log.Printf("failed to unmarshal %s payload: %v\n", cmd.Name(), err)
 					continue
 				}
-				shooter := h.s.GetPlayer(payload.Shooter.Name)
-				getShoter := h.s.GetPlayer(payload.GetShoter.Name)
 				m := h.s.GetMatch(payload.MatchID)
-				if (m.Player1.Name == shooter.Name && m.Player2.Name == getShoter.Name) || (m.Player1.Name == getShoter.Name && m.Player2.Name == shooter.Name) {
-					if getShoter.Health > 0 {
-						getShoter.Health -= 10
-						h.s.SavePlayer(getShoter)
-					}
-
-					if getShoter.Health == 0 {
-						event := Event{
-							Name: EventSomeoneWin,
-							Player: shooter,
-							MetaData: map[string]interface{}{
-								"match_id": m.ID,
-							},
-						}
-						h.hub.Write(shooter, event.Marshal())
-
-						event = Event{
-							Name: EventGameOver,
-							MetaData: map[string]interface{}{
-								"match_id":payload.MatchID,
-							},
-						}
-						h.hub.Write(shooter, event.Marshal())
-						h.hub.Write(getShoter, event.Marshal())
-						h.s.RemoveMatch(m.ID)
-						h.s.RemovePlayer(getShoter.Name)
-					}
-					h.hub.Write(getShoter, []byte(m.ID))
+				var shooter, shotPlayer player.Player
+				if payload.Player.Name == m.Player1.Name {
+					shooter = m.Player1
+					shotPlayer = m.Player2
+				} else {
+					shooter = m.Player2
+					shotPlayer = m.Player1
 				}
-				log.Println("error: match and players are not matched")
+				shotPlayer.Health -= 10
+				h.s.SavePlayer(shotPlayer)
+				m.Player1 = shooter
+				m.Player2 = shotPlayer
+				h.s.UpdateMatch(m)
+
+				if shotPlayer.Health <= 0 {
+					event := Event{
+						Name:   EventYouWon,
+						Player: shooter,
+						MetaData: map[string]interface{}{
+							"match_id": m.ID,
+						},
+					}
+
+					h.hub.Write(shooter, event.Marshal())
+					event = Event{
+						Name: EventYouLost,
+						Player: shotPlayer,
+						MetaData: map[string]interface{}{
+							"match_id": m.ID,
+						},
+					}
+					h.hub.Write(shotPlayer, event.Marshal())
+					
+					event = Event{
+						Name: EventGameOver,
+						MetaData: map[string]interface{}{
+							"match_id": payload.MatchID,
+						},
+					}
+					
+					h.hub.Write(shooter, event.Marshal())
+					h.hub.Write(shotPlayer, event.Marshal())
+					h.s.RemoveMatch(m.ID)
+				}
+
+				h.hub.Write(shotPlayer, Event{
+					Name:     EventPlayerUpdate,
+					Player:   shotPlayer,
+					MetaData: nil,
+				}.Marshal())
+
 
 			default:
 				panic("no such command")
@@ -191,9 +211,8 @@ func (h *WebsocketHandler) notifyOthers(self string, event []byte) {
 }
 
 type ShootPayload struct {
-	MatchID       string        `json:"match_id"`
-	Shooter   player.Player `json:"shoot_player"`
-	GetShoter player.Player `json:"get_shot_player"`
+	MatchID string        `json:"match_id"`
+	Player  player.Player `json:"player"`
 }
 
 type PlayPayload struct {
